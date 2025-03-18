@@ -2,6 +2,14 @@ Disclaimer
 ------------
 This repository is a fork of scikit-learn and was created with the intention of adding the differential privacy function to regression tree models
 
+Intallation
+~~~~~~~~~~~
+To install this modified version you have to take this actions
+- Clone this repository
+- Go to the folder 
+- Run this command pip install . --no-build-isolation
+- After the compilation the modified version is install in your system
+
 .. -*- mode: rst -*-
 
 |Azure| |Codecov| |CircleCI| |Nightly wheels| |Black| |PythonVersion| |PyPi| |DOI| |Benchmark|

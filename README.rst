@@ -5,10 +5,13 @@ This repository is a fork of scikit-learn and was created with the intention of 
 Intallation
 ~~~~~~~~~~~
 To install this modified version you have to take this actions
+
 - Clone this repository
 - Go to the folder 
 - Run this command pip install . --no-build-isolation
 - After the compilation the modified version is install in your system
+
+============
 
 .. -*- mode: rst -*-
 

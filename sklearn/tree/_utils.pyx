@@ -3,14 +3,20 @@
 
 from libc.stdlib cimport free
 from libc.stdlib cimport realloc
+from libc.stdlib cimport malloc
 from libc.math cimport log as ln
 from libc.math cimport isnan
+from libc.math cimport exp
 
 import numpy as np
 cimport numpy as cnp
 cnp.import_array()
 
 from ..utils._random cimport our_rand_r
+from libc.stdlib cimport rand, RAND_MAX
+from libc.math cimport ceil
+
+cdef float64_t INFINITY = np.inf
 
 # =============================================================================
 # Helper functions
@@ -458,3 +464,221 @@ def _any_isnan_axis0(const float32_t[:, :] X):
                     isnan_out[j] = True
                     break
     return np.asarray(isnan_out)
+
+
+# =============================================================================
+# DPNodeSplit for Differential Privacy data structure
+# =============================================================================
+
+# Função para criar um novo nó
+# cdef DPNodeSplit* create_dp_node_split(SplitRecordForDifferentialPrivacy* data) noexcept nogil:
+#     cdef DPNodeSplit* new_node = <DPNodeSplit*>malloc(sizeof(DPNodeSplit))
+#     if not new_node:
+#         # raise MemoryError("Erro de alocação de memória para dp_node") # Por algum motivo não tô conseguindo usar o raise, parece que ele precisa do gil
+#         return NULL
+
+#     cdef SplitRecordForDifferentialPrivacy* new_data = <SplitRecordForDifferentialPrivacy*> malloc(sizeof(SplitRecordForDifferentialPrivacy))
+#     if not new_data:
+#         free(new_node)
+#         return NULL
+
+#     new_data.feature = data.feature
+#     new_data.pos = data.pos
+#     new_data.threshold = data.threshold
+#     new_data.partial_improvement = data.partial_improvement
+    
+#     new_node.data = new_data 
+#     new_node.next = NULL
+#     return new_node  # Retorna o endereço do nó como um inteiro
+
+# # Função para adicionar um elemento ao final da lista
+# cdef void append_dp_node_split(DPNodeSplit** head, SplitRecordForDifferentialPrivacy* data) noexcept nogil:
+#     cdef DPNodeSplit* new_node = create_dp_node_split(data)
+#     if new_node == NULL:
+#         return  # Falha na alocação do nó, retorna sem fazer nada
+    
+#     if head[0] == NULL:
+#         head[0] = new_node
+#         return
+    
+#     cdef DPNodeSplit* temp = head[0]
+#     while temp.next != NULL:
+#         temp = temp.next
+#     temp.next = new_node
+
+# # Função para liberar toda a memória da lista
+# cdef void free_all_dp_node_splits(DPNodeSplit** head) noexcept nogil:
+#     cdef DPNodeSplit* temp
+#     while head[0] != NULL:
+#         temp = head[0]
+#         head[0] = head[0].next
+#         free(temp.data)
+#         free(temp)
+
+# # Pegar o maior improvement
+# cdef float64_t get_max_improvement(DPNodeSplit* head) noexcept nogil:
+#     cdef DPNodeSplit* temp = head
+#     cdef float64_t max_improvement = -INFINITY
+
+#     while temp != NULL:
+#         if temp.data.partial_improvement > max_improvement:
+#             max_improvement = temp.data.partial_improvement
+
+#         temp = temp.next
+    
+#     return max_improvement
+
+# # Pegar o menor improvement
+# cdef float64_t get_min_improvement(DPNodeSplit* head) noexcept nogil:
+#     cdef DPNodeSplit* temp = head
+#     cdef float64_t min_improvement = INFINITY
+
+#     while temp != NULL:
+#         if temp.data.partial_improvement < min_improvement:
+#             min_improvement = temp.data.partial_improvement
+
+#         temp = temp.next
+    
+#     return min_improvement
+
+# cdef void downward_scaling(DPNodeSplit* head, float64_t max_improvement) noexcept nogil:
+#     cdef DPNodeSplit* temp = head
+
+#     while temp != NULL:
+#         temp.data.partial_improvement = temp.data.partial_improvement - max_improvement
+#         temp = temp.next
+
+# cdef int32_t get_list_size(DPNodeSplit* head) noexcept nogil:
+#     cdef int32_t size = 0
+#     cdef DPNodeSplit* temp = head
+
+#     while temp != NULL:
+#         size = size + 1
+#         temp = temp.next
+
+#     return size
+
+# cdef void calculate_dp_weights(DPNodeSplit* head, float32_t epsilon, float32_t delta_q) noexcept nogil:
+#     cdef DPNodeSplit* temp = head
+
+#     while temp != NULL:
+#         temp.data.weight = exp((epsilon*temp.data.partial_improvement)/(2*delta_q))
+#         temp = temp.next
+
+# cdef void calculate_probabilities(DPNodeSplit* head) noexcept nogil:
+#     cdef DPNodeSplit* temp = head
+#     cdef float64_t sum_of_weights = 0
+
+#     while temp != NULL:
+#         sum_of_weights = sum_of_weights + temp.data.weight
+#         temp = temp.next
+
+#     temp = head
+
+#     while temp != NULL:
+#         temp.data.probability = temp.data.weight / sum_of_weights
+#         temp = temp.next
+
+# cdef void calculate_dp_weights_and_probabilities(DPNodeSplit* head, float32_t epsilon, float32_t delta_q) noexcept nogil:
+#     cdef DPNodeSplit* temp = head
+#     cdef float64_t sum_of_weights = 0
+
+#     while temp != NULL:
+#         temp.data.weight = exp((epsilon*temp.data.partial_improvement)/(2*delta_q))
+#         sum_of_weights = sum_of_weights + temp.data.weight
+#         temp = temp.next
+
+#     temp = head
+
+#     while temp != NULL:
+#         temp.data.probability = temp.data.weight / sum_of_weights
+#         temp = temp.next
+
+# cdef float64_t random_float() noexcept nogil:
+#     cdef float64_t r = rand()
+#     return r / RAND_MAX
+
+# # cdef float64_t random_float(uint32_t* seed) noexcept nogil:
+# #     cdef uint32_t r = our_rand_r(seed)
+# #     return r / RAND_MAX
+
+# cdef SplitRecordForDifferentialPrivacy* choose_a_weighted_random_threshold(DPNodeSplit* head) noexcept nogil:
+#     cdef DPNodeSplit* temp = head
+    
+#     cdef float64_t choice_chance = random_float()
+#     cdef float64_t cumulative_probability = 0.0
+
+#     while temp != NULL:
+#         cumulative_probability = cumulative_probability + temp.data.probability
+#         if choice_chance < cumulative_probability:
+#             return temp.data
+#         temp = temp.next
+
+#     return NULL
+
+# =============================================================================
+# DPNodeSplit for Differential Privacy data structure new version
+# =============================================================================
+cdef void init_array(SplitRecordArray* arr) noexcept nogil:
+    arr.data = NULL
+    arr.size = 0
+    arr.capacity = 0
+
+cdef void free_array(SplitRecordArray* arr) noexcept nogil:
+    if arr.data != NULL:
+        free(arr.data)
+        arr.data = NULL
+        arr.size = 0
+        arr.capacity = 0
+
+cdef void append_to_array(SplitRecordArray* arr, SplitRecordForDifferentialPrivacy* value) noexcept nogil:
+    cdef size_t new_capacity
+    if arr.size == arr.capacity:
+        new_capacity = 5 if arr.capacity == 0 else arr.capacity + 100
+        arr.data = <SplitRecordForDifferentialPrivacy*>realloc(arr.data, new_capacity * sizeof(SplitRecordForDifferentialPrivacy))
+        arr.capacity = new_capacity
+    arr.data[arr.size] = value[0]  # copia struct
+    arr.size += 1
+
+cdef float64_t get_max_improvement_array(SplitRecordArray* arr) noexcept nogil:
+    cdef float64_t max_imp = -INFINITY
+    cdef size_t i
+    for i in range(arr.size):
+        if arr.data[i].partial_improvement > max_imp:
+            max_imp = arr.data[i].partial_improvement
+    return max_imp
+
+cdef float64_t get_min_improvement_array(SplitRecordArray* arr) noexcept nogil:
+    cdef float64_t min_imp = INFINITY
+    cdef size_t i
+    for i in range(arr.size):
+        if arr.data[i].partial_improvement < min_imp:
+            min_imp = arr.data[i].partial_improvement
+    return min_imp
+
+cdef void downward_scaling_array(SplitRecordArray* arr, float64_t max_improvement) noexcept nogil:
+    cdef size_t i
+    for i in range(arr.size):
+        arr.data[i].partial_improvement -= max_improvement
+
+cdef void calculate_weights_and_probabilities(SplitRecordArray* arr, float64_t epsilon, float64_t delta_q) noexcept nogil:
+    cdef size_t i
+    cdef float64_t sum_weights = 0.0
+    for i in range(arr.size):
+        arr.data[i].weight = exp((epsilon * arr.data[i].partial_improvement) / (2 * delta_q))
+        sum_weights += arr.data[i].weight
+    for i in range(arr.size):
+        arr.data[i].probability = arr.data[i].weight / sum_weights
+
+cdef float64_t random_float() noexcept nogil:
+    return rand() / RAND_MAX
+
+cdef SplitRecordForDifferentialPrivacy* choose_weighted_random(SplitRecordArray* arr) noexcept nogil:
+    cdef float64_t r = random_float()
+    cdef float64_t cumulative = 0.0
+    cdef size_t i
+    for i in range(arr.size):
+        cumulative += arr.data[i].probability
+        if r < cumulative:
+            return &arr.data[i]
+    return NULL

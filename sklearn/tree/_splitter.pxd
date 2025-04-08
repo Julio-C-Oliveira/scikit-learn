@@ -97,6 +97,8 @@ cdef class Splitter:
         self,
         ParentInfo* parent,
         SplitRecord* split,
+        float32_t epsilon,
+        float32_t delta_q
     ) except -1 nogil
 
     cdef void node_value(self, float64_t* dest) noexcept nogil
@@ -104,3 +106,17 @@ cdef class Splitter:
     cdef void clip_node_value(self, float64_t* dest, float64_t lower_bound, float64_t upper_bound) noexcept nogil
 
     cdef float64_t node_impurity(self) noexcept nogil
+
+# =============================================================================
+# DPNodeSplit for Differential Privacy data structure
+# =============================================================================
+
+cdef struct SplitRecordForDifferentialPrivacy:
+    intp_t feature                      # Which feature to split on.
+    intp_t pos                          # Split samples array at the given position,
+    float64_t threshold                 # Threshold to split at.
+    float64_t partial_improvement       # Loacal impurity improvement given parent node.
+    float64_t weight
+    float64_t probability
+    uint8_t missing_go_to_left          # Controls if missing values go to the left node.
+    intp_t n_missing                    # Number of missing values for the feature being split on

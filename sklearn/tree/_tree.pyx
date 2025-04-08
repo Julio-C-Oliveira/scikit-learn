@@ -130,13 +130,16 @@ cdef class DepthFirstTreeBuilder(TreeBuilder):
 
     def __cinit__(self, Splitter splitter, intp_t min_samples_split,
                   intp_t min_samples_leaf, float64_t min_weight_leaf,
-                  intp_t max_depth, float64_t min_impurity_decrease):
+                  intp_t max_depth, float64_t min_impurity_decrease,
+                  float32_t epsilon, float32_t delta_q):
         self.splitter = splitter
         self.min_samples_split = min_samples_split
         self.min_samples_leaf = min_samples_leaf
         self.min_weight_leaf = min_weight_leaf
         self.max_depth = max_depth
         self.min_impurity_decrease = min_impurity_decrease
+        self.epsilon = epsilon
+        self.delta_q = delta_q
 
     cpdef build(
         self,
@@ -168,6 +171,10 @@ cdef class DepthFirstTreeBuilder(TreeBuilder):
         cdef float64_t min_weight_leaf = self.min_weight_leaf
         cdef intp_t min_samples_split = self.min_samples_split
         cdef float64_t min_impurity_decrease = self.min_impurity_decrease
+
+        # Args needed to calculate differential privacy
+        cdef float32_t epsilon = self.epsilon
+        cdef float32_t delta_q = self.delta_q
 
         # Recursive partition (without actual recursion)
         splitter.init(X, y, sample_weight, missing_values_in_feature_mask)
@@ -245,6 +252,8 @@ cdef class DepthFirstTreeBuilder(TreeBuilder):
                     splitter.node_split(
                         &parent_record,
                         &split,
+                        epsilon,
+                        delta_q
                     )
                     # If EPSILON=0 in the below comparison, float precision
                     # issues stop splitting, producing trees that are
@@ -384,7 +393,8 @@ cdef class BestFirstTreeBuilder(TreeBuilder):
     def __cinit__(self, Splitter splitter, intp_t min_samples_split,
                   intp_t min_samples_leaf,  min_weight_leaf,
                   intp_t max_depth, intp_t max_leaf_nodes,
-                  float64_t min_impurity_decrease):
+                  float64_t min_impurity_decrease,
+                  float64_t epsilon, float64_t delta_q):
         self.splitter = splitter
         self.min_samples_split = min_samples_split
         self.min_samples_leaf = min_samples_leaf
@@ -392,6 +402,8 @@ cdef class BestFirstTreeBuilder(TreeBuilder):
         self.max_depth = max_depth
         self.max_leaf_nodes = max_leaf_nodes
         self.min_impurity_decrease = min_impurity_decrease
+        self.epsilon = epsilon
+        self.delta_q = delta_q
 
     cpdef build(
         self,
@@ -582,6 +594,10 @@ cdef class BestFirstTreeBuilder(TreeBuilder):
         cdef float64_t weighted_n_node_samples
         cdef bint is_leaf
 
+        # Args needed to calculate differential privacy
+        cdef float32_t epsilon = self.epsilon
+        cdef float32_t delta_q = self.delta_q
+
         splitter.node_reset(start, end, &weighted_n_node_samples)
 
         # reset n_constant_features for this specific split before beginning split search
@@ -602,6 +618,8 @@ cdef class BestFirstTreeBuilder(TreeBuilder):
             splitter.node_split(
                 parent_record,
                 &split,
+                epsilon,
+                delta_q
             )
             # If EPSILON=0 in the below comparison, float precision issues stop
             # splitting early, producing trees that are dissimilar to v0.18

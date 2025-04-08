@@ -5,6 +5,7 @@
 
 cimport numpy as cnp
 from ._tree cimport Node
+from ._splitter cimport SplitRecordForDifferentialPrivacy
 from ..neighbors._quad_tree cimport Cell
 from ..utils._typedefs cimport float32_t, float64_t, intp_t, uint8_t, int32_t, uint32_t
 
@@ -98,3 +99,52 @@ cdef class WeightedMedianCalculator:
         self, float64_t data, float64_t weight,
         float64_t original_median) noexcept nogil
     cdef float64_t get_median(self) noexcept nogil
+
+# =============================================================================
+# DPNodeSplit for Differential Privacy data structure
+# =============================================================================
+
+# cdef struct DPNodeSplit
+# cdef struct DPNodeSplit:
+#     SplitRecordForDifferentialPrivacy* data # Com ponteiro deu certo
+#     DPNodeSplit* next
+
+# cdef DPNodeSplit* create_dp_node_split(SplitRecordForDifferentialPrivacy* data) noexcept nogil
+# cdef void append_dp_node_split(DPNodeSplit** head, SplitRecordForDifferentialPrivacy* data) noexcept nogil
+# cdef void free_all_dp_node_splits(DPNodeSplit** head) noexcept nogil
+
+# cdef float64_t get_max_improvement(DPNodeSplit* head) noexcept nogil
+# cdef float64_t get_min_improvement(DPNodeSplit* head) noexcept nogil
+
+# cdef void downward_scaling(DPNodeSplit* head, float64_t max_improvement) noexcept nogil
+# cdef int32_t get_list_size(DPNodeSplit* head) noexcept nogil
+
+# cdef void calculate_dp_weights(DPNodeSplit* head, float32_t epsilon, float32_t delta_q) noexcept nogil
+# cdef void calculate_probabilities(DPNodeSplit* head) noexcept nogil
+# cdef void calculate_dp_weights_and_probabilities(DPNodeSplit* head, float32_t epsilon, float32_t delta_q) noexcept nogil
+
+# cdef float64_t random_float() noexcept nogil
+# cdef SplitRecordForDifferentialPrivacy* choose_a_weighted_random_threshold(DPNodeSplit* head) noexcept nogil
+
+# =============================================================================
+# DPNodeSplit for Differential Privacy data structure new version
+# =============================================================================
+
+cdef struct SplitRecordArray:
+    SplitRecordForDifferentialPrivacy* data
+    size_t size
+    size_t capacity
+
+cdef void init_array(SplitRecordArray* arr) noexcept nogil
+cdef void free_array(SplitRecordArray* arr) noexcept nogil
+
+cdef void append_to_array(SplitRecordArray* arr, SplitRecordForDifferentialPrivacy* value) noexcept nogil
+
+cdef float64_t get_max_improvement_array(SplitRecordArray* arr) noexcept nogil
+cdef float64_t get_min_improvement_array(SplitRecordArray* arr) noexcept nogil
+cdef void downward_scaling_array(SplitRecordArray* arr, float64_t max_improvement) noexcept nogil
+
+cdef void calculate_weights_and_probabilities(SplitRecordArray* arr, float64_t epsilon, float64_t delta_q) noexcept nogil
+
+cdef float64_t random_float() noexcept nogil
+cdef SplitRecordForDifferentialPrivacy* choose_weighted_random(SplitRecordArray* arr) noexcept nogil

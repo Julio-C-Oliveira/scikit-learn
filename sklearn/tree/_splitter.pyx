@@ -29,6 +29,7 @@ from ._partitioner cimport (
     shift_missing_values_to_left_if_required
 )
 from ._utils cimport RAND_R_MAX, rand_int, rand_uniform
+from ._utils cimport SplitRecordArray, init_array, free_array, append_to_array, get_max_improvement_array, downward_scaling_array, calculate_weights_and_probabilities, choose_weighted_random
 
 import numpy as np
 
@@ -41,6 +42,7 @@ ctypedef fused Partitioner:
     DensePartitioner
     SparsePartitioner
 
+# DEBUG_FILE_PATH = "/home/juliocoliveira/Julio/Gercom/FedT_with_Differential_Privacy/Log/debug_log_v2.txt"
 
 cdef float64_t INFINITY = np.inf
 
@@ -238,6 +240,8 @@ cdef class Splitter:
         self,
         ParentInfo* parent_record,
         SplitRecord* split,
+        float32_t epsilon,
+        float32_t delta_q
     ) except -1 nogil:
 
         """Find the best split on node samples[start:end].
@@ -272,6 +276,8 @@ cdef inline int node_split_best(
     Criterion criterion,
     SplitRecord* split,
     ParentInfo* parent_record,
+    float32_t epsilon,
+    float32_t delta_q
 ) except -1 nogil:
     """Find the best split on node samples[start:end]
 
@@ -323,6 +329,13 @@ cdef inline int node_split_best(
     cdef intp_t n_known_constants = parent_record.n_constant_features
     # n_total_constants = n_known_constants + n_found_constants
     cdef intp_t n_total_constants = n_known_constants
+
+    # Variables for Differential Privacy implementation =========================
+    cdef SplitRecordForDifferentialPrivacy current_split_with_parcial_improvement
+    cdef SplitRecordArray dp_array
+    init_array(&dp_array)
+    # ===========================================================================
+
 
     _init_split(&best_split, end)
 
@@ -449,6 +462,7 @@ cdef inline int node_split_best(
                     continue
 
                 current_proxy_improvement = criterion.proxy_impurity_improvement()
+                current_split_with_parcial_improvement.partial_improvement = current_proxy_improvement
 
                 if current_proxy_improvement > best_proxy_improvement:
                     best_proxy_improvement = current_proxy_improvement
@@ -476,6 +490,17 @@ cdef inline int node_split_best(
 
                     best_split = current_split  # copy
 
+                # Replicando os dados básicos ===============================
+                if epsilon > 0.0:
+                    current_split_with_parcial_improvement.pos = current_split.pos
+                    current_split_with_parcial_improvement.threshold = current_split.threshold
+                    current_split_with_parcial_improvement.missing_go_to_left = current_split.missing_go_to_left
+                    current_split_with_parcial_improvement.n_missing = current_split.n_missing
+                    current_split_with_parcial_improvement.feature = current_split.feature
+
+                    append_to_array(&dp_array, &current_split_with_parcial_improvement)
+                # ==============================================================================
+
         # Evaluate when there are missing values and all missing values goes
         # to the right node and non-missing values goes to the left node.
         if has_missing:
@@ -498,6 +523,39 @@ cdef inline int node_split_best(
                         current_split.n_missing = n_missing
                         current_split.pos = p
                         best_split = current_split
+
+    # Lógica da implementação de Differential Privacy ========================
+    cdef float64_t max_partial_improvement = 0.0
+    cdef SplitRecordForDifferentialPrivacy* choosen_dp_threshold = NULL
+    if epsilon > 0.0:
+        # max_partial_improvement = get_max_improvement(dp_list_head)
+        # downward_scaling(dp_list_head, max_partial_improvement)
+
+        # calculate_dp_weights(dp_list_head, epsilon, delta_q)
+        # calculate_probabilities(dp_list_head)
+        # choosen_dp_threshold = choose_a_weighted_random_threshold(dp_list_head)
+
+        # best_split.feature = choosen_dp_threshold.feature
+        # best_split.pos = choosen_dp_threshold.pos
+        # best_split.threshold = choosen_dp_threshold.threshold
+        # best_split.missing_go_to_left = choosen_dp_threshold.missing_go_to_left
+        # best_split.n_missing = choosen_dp_threshold.n_missing
+
+        # free_all_dp_node_splits(&dp_list_head)
+
+        max_partial_improvement = get_max_improvement_array(&dp_array)
+        downward_scaling_array(&dp_array, max_partial_improvement)
+
+        calculate_weights_and_probabilities(&dp_array, epsilon, delta_q)
+        choosen_dp_threshold = choose_weighted_random(&dp_array)
+
+        best_split.feature = choosen_dp_threshold.feature
+        best_split.pos = choosen_dp_threshold.pos
+        best_split.threshold = choosen_dp_threshold.threshold
+        best_split.missing_go_to_left = choosen_dp_threshold.missing_go_to_left
+        best_split.n_missing = choosen_dp_threshold.n_missing
+
+        free_array(&dp_array)
 
     # Reorganize into samples[start:best_split.pos] + samples[best_split.pos:end]
     if best_split.pos < end:
@@ -808,6 +866,8 @@ cdef class BestSplitter(Splitter):
             self,
             ParentInfo* parent_record,
             SplitRecord* split,
+            float32_t epsilon,
+            float32_t delta_q
     ) except -1 nogil:
         return node_split_best(
             self,
@@ -815,6 +875,8 @@ cdef class BestSplitter(Splitter):
             self.criterion,
             split,
             parent_record,
+            epsilon,
+            delta_q
         )
 
 cdef class BestSparseSplitter(Splitter):
@@ -836,6 +898,8 @@ cdef class BestSparseSplitter(Splitter):
             self,
             ParentInfo* parent_record,
             SplitRecord* split,
+            float32_t epsilon,
+            float32_t delta_q
     ) except -1 nogil:
         return node_split_best(
             self,
@@ -843,6 +907,8 @@ cdef class BestSparseSplitter(Splitter):
             self.criterion,
             split,
             parent_record,
+            epsilon,
+            delta_q
         )
 
 cdef class RandomSplitter(Splitter):
@@ -864,6 +930,8 @@ cdef class RandomSplitter(Splitter):
             self,
             ParentInfo* parent_record,
             SplitRecord* split,
+            float32_t epsilon,
+            float32_t delta_q
     ) except -1 nogil:
         return node_split_random(
             self,
@@ -891,6 +959,8 @@ cdef class RandomSparseSplitter(Splitter):
             self,
             ParentInfo* parent_record,
             SplitRecord* split,
+            float32_t epsilon,
+            float32_t delta_q
     ) except -1 nogil:
         return node_split_random(
             self,

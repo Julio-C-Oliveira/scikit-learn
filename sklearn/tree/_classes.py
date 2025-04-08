@@ -232,6 +232,8 @@ class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
         self,
         X,
         y,
+        epsilon,
+        delta_q,
         sample_weight=None,
         check_input=True,
         missing_values_in_feature_mask=None,
@@ -457,6 +459,8 @@ class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
                 min_weight_leaf,
                 max_depth,
                 self.min_impurity_decrease,
+                epsilon,
+                delta_q
             )
         else:
             builder = BestFirstTreeBuilder(
@@ -467,6 +471,8 @@ class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
                 max_depth,
                 max_leaf_nodes,
                 self.min_impurity_decrease,
+                epsilon,
+                delta_q
             )
 
         builder.build(self.tree_, X, y, sample_weight, missing_values_in_feature_mask)
@@ -991,7 +997,7 @@ class DecisionTreeClassifier(ClassifierMixin, BaseDecisionTree):
         )
 
     @_fit_context(prefer_skip_nested_validation=True)
-    def fit(self, X, y, sample_weight=None, check_input=True):
+    def fit(self, X, y, epsilon=0.0, delta_q=1.0, sample_weight=None, check_input=True):
         """Build a decision tree classifier from the training set (X, y).
 
         Parameters
@@ -1024,6 +1030,8 @@ class DecisionTreeClassifier(ClassifierMixin, BaseDecisionTree):
         super()._fit(
             X,
             y,
+            epsilon=epsilon,
+            delta_q=delta_q,
             sample_weight=sample_weight,
             check_input=check_input,
         )
@@ -1372,7 +1380,7 @@ class DecisionTreeRegressor(RegressorMixin, BaseDecisionTree):
         )
 
     @_fit_context(prefer_skip_nested_validation=True)
-    def fit(self, X, y, sample_weight=None, check_input=True):
+    def fit(self, X, y, epsilon=0.0, delta_q=1.0, sample_weight=None, check_input=True):
         """Build a decision tree regressor from the training set (X, y).
 
         Parameters
@@ -1395,6 +1403,10 @@ class DecisionTreeRegressor(RegressorMixin, BaseDecisionTree):
             Allow to bypass several input checking.
             Don't use this parameter unless you know what you're doing.
 
+        epsilon : Non negative float, default=0.0
+
+        delta_q : Non negative float, default=1.0
+
         Returns
         -------
         self : DecisionTreeRegressor
@@ -1404,6 +1416,8 @@ class DecisionTreeRegressor(RegressorMixin, BaseDecisionTree):
         super()._fit(
             X,
             y,
+            epsilon=epsilon,
+            delta_q=delta_q,
             sample_weight=sample_weight,
             check_input=check_input,
         )
